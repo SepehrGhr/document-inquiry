@@ -151,9 +151,16 @@ and `/health/ready/`.
 ### Environment gotchas (important)
 
 - **Tests need PostgreSQL on port 5433.** A container named `roshan-test-db`
-  was created for this. It stops when Docker Desktop restarts — run
-  `docker start roshan-test-db` before `pytest`. `config/settings/test.py`
-  reads `TEST_POSTGRES_PORT` (default 5433).
+  was created for this. It can disappear when Docker Desktop restarts — if
+  `docker start roshan-test-db` says "No such container", recreate it:
+
+  ```bash
+  docker run -d --name roshan-test-db -p 5433:5432 \
+    -e POSTGRES_DB=documents -e POSTGRES_USER=documents -e POSTGRES_PASSWORD=documents \
+    postgres:17
+  ```
+
+  `config/settings/test.py` reads `TEST_POSTGRES_PORT` (default 5433).
 - **This machine cannot resolve `files.pythonhosted.org` from inside Docker.**
   `docker compose build` fails at `pip install`. The image was verified by
   temporarily vendoring wheels (`pip download` into `wheelhouse/`, then
