@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "drf_spectacular",
     "documents",
+    "rag",
 ]
 
 MIDDLEWARE = [
@@ -107,3 +108,22 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# RAG pipeline. The active index profile is a database row; these settings only
+# select it and configure the provider adapters.
+RAG = {
+    "ACTIVE_PROFILE": os.environ.get("RAG_ACTIVE_PROFILE", "default"),
+    "AUTO_INDEX": os.environ.get("RAG_AUTO_INDEX", "true") == "true",
+    "TOP_K": int(os.environ.get("RAG_TOP_K", "5")),
+    "OPENROUTER_API_KEY": os.environ.get("OPENROUTER_KEY", ""),
+    "OPENROUTER_BASE_URL": os.environ.get("RAG_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+    "ANSWER_PROVIDER": os.environ.get("RAG_ANSWER_PROVIDER", "openrouter"),
+    "ANSWER_MODEL": os.environ.get("RAG_ANSWER_MODEL", "stealth/crouton-alpha"),
+    "ANSWER_TIMEOUT": int(os.environ.get("RAG_ANSWER_TIMEOUT", "60")),
+    "EMBEDDING_TIMEOUT": int(os.environ.get("RAG_EMBEDDING_TIMEOUT", "60")),
+}
+
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "false") == "true"
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_TIME_LIMIT = 600

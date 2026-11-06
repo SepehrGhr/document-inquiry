@@ -19,6 +19,7 @@ from documents.exceptions import (
 from documents.ingestion.docx import parse_docx
 from documents.ingestion.types import ParsedDocument
 from documents.models import Document, DocumentRevision
+from rag.dispatch import schedule_indexing
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ def create_document(*, title, description, content: ContentInput, actor) -> Docu
             title=title, description=description or "", created_by=actor
         )
         _store_revision(document=document, sequence=1, parsed=parsed, upload=upload, actor=actor)
+        schedule_indexing()
     return document
 
 
@@ -72,6 +74,7 @@ def replace_content(*, document_id, content: ContentInput, expected_revision, ac
             actor=actor,
         )
         Document.objects.filter(pk=document.pk).update(updated_at=timezone.now())
+        schedule_indexing()
     return revision
 
 
