@@ -24,12 +24,78 @@ systems. Maintainability and clean layer boundaries are a top concern — the
 RAG pipeline should be replaceable without touching the API or database layer,
 and the embedding model should be swappable with minimal code changes.
 
-## Current state: foundation milestone is COMPLETE
+## Current state: foundation + vanilla RAG
 
 The Django foundation (database, document lifecycle, DOCX ingestion, REST API,
-Django Admin) is built, tested, and committed. **No AI/RAG code exists yet.**
-There is no embedder, no vector store, no LangChain dependency, no question
-model. This was deliberate — the user asked to finish the app structure first.
+Django Admin) is complete. The RAG milestone is implemented as a working
+**vanilla** pipeline: dense retrieval over pgvector, grounded answers with
+validated citations, abstention, question/answer history, and Celery + Redis
+indexing. It is not yet committed as of this update.
+
+Decisions taken with the user for this milestone:
+
+- Provider: free models through **OpenRouter** (exact model names/endpoints to
+  be supplied by the user). The embedding model is a `create_index_profile`
+  argument, not a hard-coded setting.
+- Indexing: **Celery + Redis**, triggered after commit from
+  `documents/services.py`.
+- Scope: working vanilla RAG first, then evaluation-driven improvements
+  (lexical + RRF, reranker) — not speculative advanced techniques.
+
+### RAG architecture as built
+
+```
+src/rag/
+  contracts.py        # Chunk, RetrievedPassage, AnswerResult, protocols
+  chunking.py         # CharacterChunker (char-1), offsets into exact text
+  citations.py        # [S1] extraction and validation
+  models.py           # IndexProfile, IndexBuild, IndexBuildRevision,
+                      # IndexedChunk (pgvector), Question, Answer, AnswerSource
+  indexing.py         # create_build / run_build / activation rules
+  dispatch.py         # transaction.on_commit -> Celery task
+  services.py         # ask(): retrieve -> generate -> validate -> persist
+  factory.py          # the only place adapters are chosen
+  tasks.py            # run_index_build
+  adapters/
+    openrouter.py     # LangChain OpenAI-compatible chat + embeddings
+    pgvector_index.py # dense search scoped to the active build
+    fakes.py          # HashingEmbedder, EchoAnswerGenerator (tests)
+  api/                # POST/GET /api/v1/questions/, GET /questions/{id}/
+  management/commands/create_index_profile.py, rebuild_index.py
+```
+
+Key invariants:
+
+- Chunks are keyed by `(profile, revision, ordinal)`; builds reference
+  revisions, so unchanged vectors are reused across builds.
+- A build activates only if completed **and** it still covers every current
+  revision; at most one build is active (partial unique constraint).
+- Retrieval filters by active build and excludes logically deleted documents.
+- An answer with no valid citation is stored as an abstention.
+
+### Verification status (RAG milestone)
+
+- `pytest` — 44 passed (needs a pgvector-enabled PostgreSQL; see below).
+- `ruff check .` — clean; `ruff format` applied to new files.
+- `makemigrations --check --dry-run` — no pending changes.
+- OpenAPI generation — 0 errors, 0 warnings.
+- Celery app discovers `rag.tasks.run_index_build`.
+- **Not yet verified:** a live OpenRouter call (no model/key supplied yet) and
+  a full `docker compose` run of web + worker + redis.
+
+### Test database now needs pgvector
+
+The old `roshan-test-db` (plain `postgres:17`) cannot create the `vector`
+extension. Recreate it with the pgvector image:
+
+```bash
+docker rm -f roshan-test-db
+docker run -d --name roshan-test-db -p 5433:5432 \
+  -e POSTGRES_DB=documents -e POSTGRES_USER=documents -e POSTGRES_PASSWORD=documents \
+  pgvector/pgvector:pg17
+```
+
+The `rag` migration runs `CREATE EXTENSION IF NOT EXISTS vector` itself.
 
 ### Git history (branch `master`, no remote)
 
@@ -157,10 +223,12 @@ and `/health/ready/`.
   ```bash
   docker run -d --name roshan-test-db -p 5433:5432 \
     -e POSTGRES_DB=documents -e POSTGRES_USER=documents -e POSTGRES_PASSWORD=documents \
-    postgres:17
+    pgvector/pgvector:pg17
   ```
 
-  `config/settings/test.py` reads `TEST_POSTGRES_PORT` (default 5433).
+  `config/settings/test.py` reads `TEST_POSTGRES_PORT` (default 5433). The
+  image must be pgvector-enabled; plain `postgres:17` cannot run the `rag`
+  migration.
 - **This machine cannot resolve `files.pythonhosted.org` from inside Docker.**
   `docker compose build` fails at `pip install`. The image was verified by
   temporarily vendoring wheels (`pip download` into `wheelhouse/`, then
@@ -174,24 +242,29 @@ and `/health/ready/`.
   POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5433`, then `manage.py migrate` /
   `runserver`.
 
-## What is NOT done (the next milestone)
+## What is NOT done (next steps)
 
-Everything below is the RAG milestone. None of it exists yet.
-
-- `rag/` app: indexing, retrieval, context construction, generation.
-- Embedding provider + embedding profile/versioning.
-- Vector storage (pgvector was the plan; not installed or enabled).
-- LangChain orchestration (mandatory by the brief).
-- Question/Answer/AnswerSource models and history.
-- Question endpoints.
-- Background indexing (Celery/Redis) — deferred; synchronous is acceptable.
-- Retrieval evaluation dataset and metrics.
-- Persian/mixed-language retrieval quality testing.
+- **Live OpenRouter verification — DONE (2026-11-07).** Models are in the
+  gitignored `model-guide/` folder: chat `stealth/crouton-alpha`, embeddings
+  `nvidia/nemotron-3-embed-1b:free` (2048 dims). Key is `OPENROUTER_KEY` in
+  `.env`. Profile `default` was created and a build activated. Live smoke test
+  passed: English, Persian, and an unanswerable question (correctly abstained).
+  Note: free models return `429` under rapid successive calls; the adapter
+  retries twice, but the evaluation harness should pace requests.
+- **Docker end-to-end run** of web + worker + redis + pgvector db.
+- **Evaluation harness** (dataset + metrics) — the next milestone, and the
+  gate for any retrieval upgrade.
+- **Lexical retrieval + RRF**, then an optional reranker, only if evaluation
+  justifies it.
+- **Persian/mixed-language retrieval quality testing.**
+- **Vector index (HNSW/IVFFlat)** once the corpus is large enough to need it.
+- **Async answer generation** if free-model latency makes the request path
+  unacceptable.
 
 ### The agreed plan for the RAG milestone
 
-The user approved this direction in the planning session. Re-confirm before
-building, but this is the intended shape:
+The user approved this direction in the planning session. The vanilla part is
+now built; the rest is the intended shape for the evaluation-driven phase:
 
 - **Contracts, not frameworks.** Small explicit interfaces: `DocumentParser`,
   `Chunker`, `Embedder`, `ChunkIndex`, `Retriever`, `AnswerGenerator`. A
@@ -222,13 +295,11 @@ building, but this is the intended shape:
 
 ### Open questions to settle with the user
 
-- Which LLM provider and embedding model? (Language: Persian + English + mixed.
-  No provider has been chosen. The user has no embedder yet by design.)
-- Is an API key available for the chosen provider, or should the system support
-  a local model?
-- Is Celery/Redis acceptable, or keep ingestion synchronous?
-- Should the RAG milestone also add a small evaluation harness, or is that
-  separate?
+- Exact OpenRouter chat model and embedding model/endpoint (user will supply).
+- Whether OpenRouter serves embeddings at all; otherwise which embedding
+  provider or local model to use.
+- Whether the evaluation harness should be a separate milestone (current plan)
+  or part of the next commit.
 
 ## Working conventions in this repo
 

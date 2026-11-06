@@ -1,9 +1,7 @@
-# Document Q&A — Foundation
+# Document Q&A
 
-A Django service for managing text documents and DOCX uploads. This milestone
-covers the database, document lifecycle, REST API, and Django Admin. Retrieval
-and answer generation (LangChain) are the next milestone and are not part of
-this code yet.
+A Django service for managing text documents and DOCX uploads, and answering
+questions grounded in them with a RAG pipeline (LangChain, pgvector, Celery).
 
 ## What works today
 
@@ -17,14 +15,28 @@ this code yet.
 - English, Persian, and mixed text are stored exactly as provided (no
   normalization).
 - OpenAPI schema at `/api/schema/` and Swagger UI at `/api/docs/`.
+- Dense retrieval over pgvector, grounded answers with validated citations,
+  abstention on weak evidence, and question/answer history.
+- Background indexing through Celery + Redis, triggered after a revision
+  commits (from both the API and Admin).
 
 ## Run with Docker
 
 ```bash
-cp .env.example .env          # then set DJANGO_SECRET_KEY
+cp .env.example .env          # then set DJANGO_SECRET_KEY and the RAG_* values
 docker compose up -d --build
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
+```
+
+The stack runs `web` (Django), `worker` (Celery), `redis`, and a
+pgvector-enabled PostgreSQL. Before asking questions, create an index profile
+and build the index:
+
+```bash
+docker compose exec web python manage.py create_index_profile \
+  --model <embedding-model-id> --dimension <dimension>
+docker compose exec web python manage.py rebuild_index
 ```
 
 - Admin: http://localhost:8000/admin/
@@ -70,7 +82,17 @@ curl -s -OJ $BASE/documents/<id>/revisions/1/file/ -H "Authorization: Token $TOK
 
 # Delete (logical)
 curl -s -X DELETE $BASE/documents/<id>/ -H "Authorization: Token $TOKEN"
+
+# Ask a question (grounded answer with sources, or an abstention)
+curl -s -X POST $BASE/questions/ -H "Authorization: Token $TOKEN" \
+  -H "Content-Type: application/json" -d '{"question": "How long do refunds take?"}'
+
+# Question history
+curl -s $BASE/questions/ -H "Authorization: Token $TOKEN"
+curl -s $BASE/questions/<id>/ -H "Authorization: Token $TOKEN"
 ```
+
+`POST /questions/` returns `503` when no index is active yet.
 
 ## Development
 
@@ -83,15 +105,19 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 Tests run against PostgreSQL (not SQLite) because the lifecycle relies on row
-locks and database constraints:
+locks and database constraints, and the RAG app needs the `vector` extension:
 
 ```bash
 docker run -d --name roshan-test-db -p 5433:5432 \
   -e POSTGRES_DB=documents -e POSTGRES_USER=documents -e POSTGRES_PASSWORD=documents \
-  postgres:17
+  pgvector/pgvector:pg17
 .venv/bin/pytest
 .venv/bin/ruff check .
 ```
+
+The default suite uses deterministic fake adapters (`RAG_ANSWER_PROVIDER=fake`,
+`CELERY_TASK_ALWAYS_EAGER=true` in `config.settings.test`), so it never needs
+Redis, an API key, or network access.
 
 ## Design notes
 
@@ -108,8 +134,23 @@ docker run -d --name roshan-test-db -p 5433:5432 \
   size, and extracted text length are limited; macros, encryption, and DTDs are
   rejected. Only body paragraphs and tables are extracted — no headers,
   footers, text boxes, or page numbers.
-- **No AI dependencies yet.** No embedder, vector store, or model provider is
-  required to run or test this milestone.
+- **RAG is a separate app with explicit contracts.** `rag/contracts.py` defines
+  `Chunk`, `RetrievedPassage`, `AnswerResult`, and the `Chunker`/`Embedder`/
+  `AnswerGenerator` interfaces. LangChain and OpenRouter live only in
+  `rag/adapters/`; `rag/factory.py` is the single composition point.
+- **Embedding changes are data migrations.** `IndexProfile` records the model,
+  dimension, metric, and chunker versions. Changing any of them means a new
+  profile and a new build, not a settings flip.
+- **Index builds are revision snapshots.** Chunks are keyed by profile and
+  immutable revision, so a new build reuses unchanged vectors. A build is
+  activated only after it completes and only if it still covers every current
+  revision; retrieval always filters through the active build.
+- **Indexing is queued after commit.** `documents/services.py` schedules a
+  build with `transaction.on_commit`, so API and Admin writes share one path
+  and a rolled-back revision never gets indexed.
+- **Answers are grounded or abstained.** Retrieved text is treated as
+  untrusted data; citations are validated against the supplied passages, and an
+  answer with no supported citation is recorded as an abstention.
 
 ## Known limitations
 
@@ -119,3 +160,17 @@ docker run -d --name roshan-test-db -p 5433:5432 \
   leave an orphaned file. `python manage.py audit_orphan_files` reports them;
   add `--delete` to remove files older than 24 hours.
 - No per-user document ownership; all staff share one library.
+- Retrieval is dense-only (vanilla RAG). No lexical/BM25 retrieval, rank
+  fusion, or reranking yet; those are the next, evaluation-driven steps.
+- Answer generation is synchronous inside the request. Slow free models can
+  make `POST /questions/` slow; indexing is the only asynchronous step.
+- OpenRouter free models are rate-limited and can change or disappear. Every
+  answer records the provider and model used, but historical answers are not
+  reproducible if the model changes.
+- The embedding model is not chosen yet; `create_index_profile` takes it as an
+  argument. OpenRouter may not serve a suitable embedding model, in which case
+  the embedder adapter needs a different provider.
+- No vector index (HNSW/IVFFlat) is created; search is exact and fine for small
+  corpora but will need an index at scale.
+- Deleting a document excludes it from retrieval immediately, but its chunks
+  remain stored until a new build or a purge.
