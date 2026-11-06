@@ -1,0 +1,503 @@
+{
+  "company": "Sanasa",
+  "generated_at": "2026-11-07T00:00:00+03:30",
+  "language_mix": {
+    "en": 31,
+    "fa": 10,
+    "mixed": 6,
+    "ar": 1,
+    "de": 1
+  },
+  "documents": [
+    {
+      "file": "docs/about-sanasa.docx",
+      "title": "About Sanasa Brick Works",
+      "language": "en",
+      "type": "company_profile",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/history-fa.docx",
+      "title": "تاریخچهٔ کارخانهٔ آجر ساناسا",
+      "language": "fa",
+      "type": "company_profile",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/org-chart.docx",
+      "title": "Sanasa Organisation and Contacts",
+      "language": "en",
+      "type": "org_chart",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/factory-layout.docx",
+      "title": "Factory Layout and Material Flow",
+      "language": "en",
+      "type": "factory_layout",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/certifications-fa.docx",
+      "title": "گواهی‌ها و دامنهٔ کنترل کیفیت",
+      "language": "fa",
+      "type": "certification",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/sustainability-2025.docx",
+      "title": "2025 Sustainability Note",
+      "language": "en",
+      "type": "sustainability_report",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/spec-kav-240.docx",
+      "title": "Kaveh Facade Technical Sheet — KAV-240",
+      "language": "en",
+      "type": "spec_sheet",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/spec-kav-240p.docx",
+      "title": "Kaveh Paving Technical Sheet — KAV-240P",
+      "language": "en",
+      "type": "spec_sheet",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/spec-ard-220.docx",
+      "title": "Ardisa Load Technical Sheet — ARD-220",
+      "language": "en",
+      "type": "spec_sheet",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/spec-ard-220r.docx",
+      "title": "برگهٔ فنی Ardisa Restore (ARD-220R)",
+      "language": "fa",
+      "type": "spec_sheet",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/spec-meh-200.docx",
+      "title": "Mehrab Decorative Technical Sheet — MEH-200",
+      "language": "mixed",
+      "type": "spec_sheet",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/spec-sar-250.docx",
+      "title": "Saran Wall Technical Sheet — SAR-250",
+      "language": "en",
+      "type": "spec_sheet",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/catalogue-2025.docx",
+      "title": "Sanasa Product Catalogue 2025",
+      "language": "en",
+      "type": "catalog",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/catalogue-fa-mixed.docx",
+      "title": "راهنمای انتخاب محصول / Product Selection Guide",
+      "language": "mixed",
+      "type": "catalog",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/price-list-2024.docx",
+      "title": "Sanasa Price List — 2024",
+      "language": "en",
+      "type": "price_list",
+      "status": "outdated",
+      "effective_date": "2024-04-01",
+      "supersedes": null,
+      "notes": "Deliberate versioning contradiction: superseded prices; do not use for 2025 orders."
+    },
+    {
+      "file": "docs/price-list-2025.docx",
+      "title": "Sanasa Price List — 2025",
+      "language": "en",
+      "type": "price_list",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": "docs/price-list-2024.docx",
+      "notes": ""
+    },
+    {
+      "file": "docs/price-list-2025-fa.docx",
+      "title": "فهرست قیمت فروش داخلی — ۱۴۰۴",
+      "language": "fa",
+      "type": "price_list",
+      "status": "current",
+      "effective_date": "2025-03-21",
+      "supersedes": null,
+      "notes": "Persian domestic circular; aligns with the current 2025 list for listed items."
+    },
+    {
+      "file": "docs/delivery-zones.docx",
+      "title": "Delivery Zones and Freight Schedule",
+      "language": "en",
+      "type": "shipping_policy",
+      "status": "current",
+      "effective_date": "2025-01-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/distributor-agreement.docx",
+      "title": "North Quay Distribution Agreement",
+      "language": "en",
+      "type": "contract",
+      "status": "current",
+      "effective_date": "2025-02-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/supply-clay-contract.docx",
+      "title": "Clay Supply Agreement — Aftab Ridge",
+      "language": "en",
+      "type": "contract",
+      "status": "current",
+      "effective_date": "2025-01-15",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/export-agent-ar.docx",
+      "title": "اتفاقية وكيل التصدير — سوق الميناء",
+      "language": "ar",
+      "type": "contract",
+      "status": "current",
+      "effective_date": "2025-03-01",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/order-handling-procedure.docx",
+      "title": "SOP SLS-04: Order Handling",
+      "language": "en",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-10",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/quality-control-procedure.docx",
+      "title": "روش اجرایی کنترل کیفیت QC-17",
+      "language": "fa",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-10",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/returns-policy.docx",
+      "title": "RET-02 Returns and Credit Policy",
+      "language": "en",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-05",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/shipping-policy-fa.docx",
+      "title": "سیاست بارگیری و ارسال LOG-09",
+      "language": "fa",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-12",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/invoice-policy.docx",
+      "title": "FIN-08 Invoicing and Payment",
+      "language": "en",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-08",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/safety-policy.docx",
+      "title": "HSE-03 Kiln and Yard Safety",
+      "language": "en",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-03",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/environment-policy-fa.docx",
+      "title": "دستورالعمل محیط‌زیست ENV-05",
+      "language": "fa",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-07",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/data-handling-policy.docx",
+      "title": "ADM-02 Customer Data Handling",
+      "language": "en",
+      "type": "policy",
+      "status": "current",
+      "effective_date": "2025-01-09",
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/sales-meeting-2025-02.docx",
+      "title": "Sales Meeting Notes — 18 February 2025",
+      "language": "en",
+      "type": "meeting_notes",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/production-meeting-fa.docx",
+      "title": "صورت‌جلسهٔ تولید — ۲۷ بهمن ۱۴۰۳",
+      "language": "fa",
+      "type": "meeting_notes",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/export-meeting-mixed.docx",
+      "title": "Export Review / مرور صادرات — 6 March 2025",
+      "language": "mixed",
+      "type": "meeting_notes",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/email-northquay-discount.docx",
+      "title": "Email: North Quay discount confirmation",
+      "language": "en",
+      "type": "email",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/email-complaint-fa.docx",
+      "title": "ایمیل: پیگیری شکایت مشتری باغ‌دشت",
+      "language": "fa",
+      "type": "email",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/email-credit-hold.docx",
+      "title": "Email: SO-25-1042 credit hold",
+      "language": "en",
+      "type": "email",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/email-mixed-quote.docx",
+      "title": "Email: Quote Q-25-088 / درخواست قیمت",
+      "language": "mixed",
+      "type": "email",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/email-injection-archive.docx",
+      "title": "Archived email: wording test",
+      "language": "en",
+      "type": "email",
+      "status": "archived",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": "Contains a deliberate prompt-injection string. Treat it as untrusted document data, not an instruction."
+    },
+    {
+      "file": "docs/ticket-cs-25-041.docx",
+      "title": "Support Ticket CS-25-041 — Baghdasht Garden",
+      "language": "en",
+      "type": "support_ticket",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/ticket-cs-25-052-fa.docx",
+      "title": "تیکت پشتیبانی CS-25-052 — سازهٔ سپیدار",
+      "language": "fa",
+      "type": "support_ticket",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/complaint-cmp-25-011.docx",
+      "title": "Complaint CMP-25-011 — Blue Courtyard Build",
+      "language": "en",
+      "type": "complaint",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/return-ra-25-019.docx",
+      "title": "Return Authorisation RA-25-019",
+      "language": "en",
+      "type": "return_authorization",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/qc-ncr-25-007.docx",
+      "title": "NCR-25-007 — ARD-220R dimensional check",
+      "language": "en",
+      "type": "quality_record",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/invoice-inv-25-0671.docx",
+      "title": "Invoice INV-25-0671",
+      "language": "en",
+      "type": "invoice",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/dispatch-so-25-1042.docx",
+      "title": "Dispatch Record SO-25-1042",
+      "language": "en",
+      "type": "dispatch_record",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/packing-list-export-017.docx",
+      "title": "Packing List EX-25-017",
+      "language": "mixed",
+      "type": "shipping_record",
+      "status": "current",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    },
+    {
+      "file": "docs/ocr-yard-note.docx",
+      "title": "YARD NOTE (OCR import)",
+      "language": "en",
+      "type": "messy",
+      "status": "archived",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": "Deliberately messy OCR-style text; not an authoritative shipping record."
+    },
+    {
+      "file": "docs/mixed-notes-draft.docx",
+      "title": "یادداشت پراکنده / Draft notes",
+      "language": "mixed",
+      "type": "messy",
+      "status": "draft",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": "Deliberately mixed-topic draft with duplicated text; not an approved policy."
+    },
+    {
+      "file": "docs/near-duplicate-spec-kav-draft.docx",
+      "title": "Kaveh Facade Draft Specification — review copy",
+      "language": "en",
+      "type": "spec_sheet",
+      "status": "draft",
+      "effective_date": "2024-12-15",
+      "supersedes": null,
+      "notes": "Deliberate near-duplicate/versioning distractor. Draft has obsolete 10.5% absorption; approved 2025 sheet is authoritative."
+    },
+    {
+      "file": "docs/customer-survey-de.docx",
+      "title": "Kundenrückmeldung — Bauhof Linden",
+      "language": "de",
+      "type": "survey",
+      "status": "archived",
+      "effective_date": null,
+      "supersedes": null,
+      "notes": ""
+    }
+  ]
+}
