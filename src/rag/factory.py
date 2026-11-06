@@ -7,7 +7,9 @@ knows which concrete adapters are in use.
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
+from rag.adapters.cache import CachedEmbedder, EmbeddingCache
 from rag.adapters.fakes import EchoAnswerGenerator, HashingEmbedder
+from rag.adapters.jina import JinaEmbedder
 from rag.adapters.openrouter import OpenRouterAnswerGenerator, OpenRouterEmbedder
 from rag.chunking import CharacterChunker
 
@@ -17,6 +19,15 @@ def build_chunker(profile) -> CharacterChunker:
 
 
 def build_embedder(profile):
+    embedder = _build_uncached_embedder(profile)
+    if not settings.RAG["EMBEDDING_CACHE"]:
+        return embedder
+    return CachedEmbedder(
+        embedder, EmbeddingCache(settings.RAG["EMBEDDING_CACHE_DIR"]), profile.model_id
+    )
+
+
+def _build_uncached_embedder(profile):
     if profile.provider == "fake":
         return HashingEmbedder(dimension=profile.dimension)
     if profile.provider == "openrouter":
@@ -26,6 +37,17 @@ def build_embedder(profile):
         return OpenRouterEmbedder(
             api_key=config["OPENROUTER_API_KEY"],
             base_url=config["OPENROUTER_BASE_URL"],
+            model=profile.model_id,
+            dimension=profile.dimension,
+            timeout=config["EMBEDDING_TIMEOUT"],
+        )
+    if profile.provider == "jina":
+        config = settings.RAG
+        if not config["JINA_API_KEY"]:
+            raise ImproperlyConfigured("JINA_KEY is not set.")
+        return JinaEmbedder(
+            api_key=config["JINA_API_KEY"],
+            base_url=config["JINA_BASE_URL"],
             model=profile.model_id,
             dimension=profile.dimension,
             timeout=config["EMBEDDING_TIMEOUT"],

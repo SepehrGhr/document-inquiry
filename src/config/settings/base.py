@@ -121,6 +121,12 @@ RAG = {
     "ANSWER_MODEL": os.environ.get("RAG_ANSWER_MODEL", "stealth/crouton-alpha"),
     "ANSWER_TIMEOUT": int(os.environ.get("RAG_ANSWER_TIMEOUT", "60")),
     "EMBEDDING_TIMEOUT": int(os.environ.get("RAG_EMBEDDING_TIMEOUT", "60")),
+    "JINA_API_KEY": os.environ.get("JINA_KEY", ""),
+    "JINA_BASE_URL": os.environ.get("RAG_JINA_BASE_URL", "https://api.jina.ai/v1"),
+    "EMBEDDING_CACHE": os.environ.get("RAG_EMBEDDING_CACHE", "true") == "true",
+    "EMBEDDING_CACHE_DIR": os.environ.get(
+        "RAG_EMBEDDING_CACHE_DIR", str(BASE_DIR / ".cache" / "embeddings")
+    ),
 }
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")

@@ -5,6 +5,8 @@ __pycache__/
 .ruff_cache/
 .env
 model-guide/
+eval-results/
 media/
 staticfiles/
 *.sqlite3
+.cache/
