@@ -10,3 +10,8 @@ media/
 staticfiles/
 *.sqlite3
 .cache/
+
+# Local handoff notes and assignment brief
+HANDOFF.md
+FINAL_POLISH_HANDOFF.md
+پروژه LLM.md
