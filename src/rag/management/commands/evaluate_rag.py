@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from rag.adapters import pgvector_index
+from rag.adapters.retriever import RETRIEVAL_MODES
 from rag.evaluation.dataset import CorpusError
 from rag.evaluation.dataset import load_corpus as read_corpus
 from rag.evaluation.report import retrieval_markdown, retrieval_report, write_json
@@ -18,6 +19,21 @@ class Command(BaseCommand):
         parser.add_argument("--corpus", default="tests/fixtures/corpus")
         parser.add_argument("--profile", default=settings.RAG["ACTIVE_PROFILE"])
         parser.add_argument("--top-k", type=int, default=settings.RAG["TOP_K"])
+        parser.add_argument("--mode", choices=RETRIEVAL_MODES, default="dense")
+        parser.add_argument("--candidate-k", type=int, default=settings.RAG["RETRIEVAL_CANDIDATES"])
+        parser.add_argument("--rrf-k", type=int, default=settings.RAG["RRF_K"])
+        parser.add_argument(
+            "--reranker",
+            choices=("none", "jina"),
+            default="none",
+            help="Optional reranker; defaults to none independently of the API settings.",
+        )
+        parser.add_argument(
+            "--rerank-candidate-k",
+            type=int,
+            default=settings.RAG["RERANK_CANDIDATES"],
+            help="Candidate shortlist to rerank (at least --top-k).",
+        )
         parser.add_argument("--limit", type=int, default=0, help="Only the first N questions.")
         parser.add_argument("--delay", type=float, default=0.0, help="Seconds between questions.")
         parser.add_argument("--output", default="eval-results")
@@ -28,6 +44,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        for name in ("top_k", "candidate_k", "rrf_k", "rerank_candidate_k"):
+            if options[name] < 1:
+                raise CommandError(f"--{name.replace('_', '-')} must be positive.")
         try:
             corpus = read_corpus(options["corpus"])
         except CorpusError as exc:
@@ -46,6 +65,11 @@ class Command(BaseCommand):
             corpus,
             build,
             top_k=options["top_k"],
+            mode=options["mode"],
+            candidate_k=options["candidate_k"],
+            rank_constant=options["rrf_k"],
+            reranker=options["reranker"],
+            rerank_candidate_k=options["rerank_candidate_k"],
             limit=options["limit"],
             delay=options["delay"],
             progress=self._progress,

@@ -17,6 +17,8 @@ questions grounded in them with a RAG pipeline (LangChain, pgvector, Celery).
 - OpenAPI schema at `/api/schema/` and Swagger UI at `/api/docs/`.
 - Dense retrieval over pgvector, grounded answers with validated citations,
   abstention on weak evidence, and question/answer history.
+- Optional PostgreSQL lexical search and hybrid retrieval with reciprocal rank
+  fusion (RRF), using the same retriever in the API and evaluation harness.
 - Background indexing through Celery + Redis, triggered after a revision
   commits (from both the API and Admin).
 - A retrieval evaluation harness with a committed 49-document synthetic corpus
@@ -100,6 +102,84 @@ curl -s $BASE/questions/<id>/ -H "Authorization: Token $TOKEN"
 
 `POST /questions/` returns `503` when no index is active yet.
 
+## Retrieval modes
+
+Run migrations after updating the app:
+
+```bash
+python manage.py migrate
+```
+
+The lexical-search migration backfills derived text for existing chunks and
+creates a stored `tsvector` with a GIN index. It does not re-embed documents.
+New chunks populate the derived text during indexing. Source text, citation
+text, and embeddings are preserved.
+
+Configure the question API with these environment variables, then restart web
+processes:
+
+```dotenv
+RAG_RETRIEVAL_MODE=hybrid_rrf
+RAG_RETRIEVAL_CANDIDATES=20
+RAG_RRF_K=60
+RAG_TOP_K=5
+```
+
+Modes are `dense` (default), `lexical`, and `hybrid_rrf`. Hybrid fetches at least
+20 candidates from each search method, fuses them by chunk ID using
+`sum(1 / (60 + rank))`, and returns the best `TOP_K` passages with fresh ranks.
+Scores in hybrid answer sources are fusion scores when reranking is disabled,
+not cosine similarities.
+Both searches use the same build/profile/revision and deletion filters.
+
+Lexical search uses PostgreSQL's `simple` configuration and `ts_rank_cd`
+ranking. Query terms are combined with OR after filtering common English and
+Persian question words. Derived text normalizes Arabic/Persian letter and digit
+variants, vowel marks, and half-spaces; hyphenated product codes remain intact.
+It does not perform stemming or translation and is not BM25. See
+[Django's full-text search documentation](https://docs.djangoproject.com/en/5.2/ref/contrib/postgres/search/)
+for the underlying database functions.
+
+Dense remains the default because it currently outperforms equal-weight hybrid
+RRF on this corpus. Hybrid is available for explicit evaluation and use.
+
+### Optional Jina reranking
+
+Reranking is disabled by default and works with all three retrieval modes.
+To enable it for the question API, set these variables and restart web processes:
+
+```dotenv
+JINA_KEY=your-jina-key
+RAG_RERANKER=jina
+RAG_RERANK_MODEL=jina-reranker-v2-base-multilingual
+RAG_RERANK_CANDIDATES=20
+RAG_RERANK_TIMEOUT=60
+RAG_TOP_K=5
+```
+
+The default model is Jina's multilingual cross-encoder; `RAG_RERANK_MODEL` can
+select another text reranker supported by [Jina's API](https://jina.ai/reranker/).
+The existing `RAG_JINA_BASE_URL` applies to both embedding and reranking requests.
+No new index profile, migration, or re-embedding is needed for reranking.
+
+The retriever fetches at least `RAG_RERANK_CANDIDATES` passages (never fewer than
+`RAG_TOP_K`). In hybrid mode, RRF produces this larger shortlist **before**
+reranking. Jina receives the question and candidate passage texts, returns their
+ranked input indices, and the top `RAG_TOP_K` original passages go to generation.
+Source IDs, text, and citation metadata are preserved. Persisted source scores
+are then **reranker relevance scores**, not dense similarities or RRF scores;
+they are not calibrated confidence probabilities.
+
+Each nonempty shortlist makes a live Jina request, even when embeddings are
+cached. Account for provider cost, quotas, extra latency, and sending document
+text to Jina. HTTP/timeouts or malformed results fail the question through the
+existing provider-error path; there is no silent fallback to unreranked results.
+Set `RAG_RERANKER=none` to disable it. Relevance ranking does not establish factual
+support, document authority, or prompt-injection safety. On the current corpus,
+dense + Jina improves recall@5 (0.814 → 0.853), but lowers hit@5 and regresses
+exact-term/ambiguous cases, so reranking remains opt-in. Full results and limits:
+[docs/eval-baseline.md](docs/eval-baseline.md).
+
 ## Development
 
 Requires Python 3.13 and a PostgreSQL instance.
@@ -141,13 +221,34 @@ python manage.py load_eval_corpus --actor <username>
 # Build the index for a profile
 python manage.py rebuild_index --profile jina-v3 --sync
 
-# Retrieval-only evaluation (no chat calls)
-python manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10
+# Compare retrieval modes on the same active build (no chat calls)
+python manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10 \
+  --mode dense --output eval-results/dense
+python manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10 \
+  --mode lexical --output eval-results/lexical
+python manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10 \
+  --mode hybrid_rrf --candidate-k 20 --rrf-k 60 --output eval-results/hybrid
+
+# Opt into Jina reranking (live rerank calls, but still no answer-model calls).
+# Compare against the same mode/top-k without --reranker; use separate outputs.
+python manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10 \
+  --mode dense --reranker jina --rerank-candidate-k 20 \
+  --output eval-results/dense-reranked
+python manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10 \
+  --mode hybrid_rrf --candidate-k 20 --rrf-k 60 \
+  --reranker jina --rerank-candidate-k 20 --output eval-results/hybrid-reranked
 ```
 
-Results are written to `eval-results/` (gitignored). The current dense baseline
-with Jina v3 is recall@5 0.814 and MRR 0.808 over 59 scored questions; the
-per-tier breakdown is in `HANDOFF.md`.
+Results are written to `eval-results/` (gitignored). The command defaults to
+`--mode dense --reranker none`, independently of the API's settings. Reports
+record the mode, candidate pool, RRF constant, lexical versions, and reranking
+provider/model/shortlist depth. The reranker model comes from `RAG_RERANK_MODEL`.
+Cached embeddings are reused when available; new question text still requires
+an embedding call, and enabled reranking always calls Jina for nonempty results.
+
+On the 71-question Jina v3 comparison (59 questions with expected sources, zero
+errors), dense recall@5 is **0.814** and hybrid is **0.791**. The full summary,
+conditions, and limitations are in [docs/eval-baseline.md](docs/eval-baseline.md).
 
 ## Design notes
 
@@ -166,7 +267,7 @@ per-tier breakdown is in `HANDOFF.md`.
   footers, text boxes, or page numbers.
 - **RAG is a separate app with explicit contracts.** `rag/contracts.py` defines
   `Chunk`, `RetrievedPassage`, `AnswerResult`, and the `Chunker`/`Embedder`/
-  `AnswerGenerator` interfaces. LangChain and the provider SDKs live only in
+  `Retriever`/`Reranker`/`AnswerGenerator` interfaces. LangChain and the provider SDKs live only in
   `rag/adapters/`; `rag/factory.py` is the single composition point.
 - **Embedders are swappable.** OpenRouter and Jina adapters both implement the
   same contract. The Jina adapter uses its `retrieval.passage` /
@@ -195,8 +296,10 @@ per-tier breakdown is in `HANDOFF.md`.
   leave an orphaned file. `python manage.py audit_orphan_files` reports them;
   add `--delete` to remove files older than 24 hours.
 - No per-user document ownership; all staff share one library.
-- Retrieval is dense-only (vanilla RAG). No lexical/BM25 retrieval, rank
-  fusion, or reranking yet; those are the next, evaluation-driven steps.
+- Equal-weight hybrid retrieval currently regresses overall recall on the
+  Sanasa corpus. Dense is the default. Optional Jina reranking improves mean
+  recall@5 but introduces some no-hit cases and exact-term/ambiguous regressions;
+  see the evaluation report. BM25 is not implemented.
 - Answer generation is synchronous inside the request. Slow free models can
   make `POST /questions/` slow; indexing is the only asynchronous step.
 - Free models are rate-limited and can change or disappear. OpenRouter's free

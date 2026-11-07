@@ -9,9 +9,12 @@ from django.core.exceptions import ImproperlyConfigured
 
 from rag.adapters.cache import CachedEmbedder, EmbeddingCache
 from rag.adapters.fakes import EchoAnswerGenerator, HashingEmbedder
-from rag.adapters.jina import JinaEmbedder
+from rag.adapters.jina import JinaEmbedder, JinaReranker
 from rag.adapters.openrouter import OpenRouterAnswerGenerator, OpenRouterEmbedder
+from rag.adapters.retriever import PostgresRetriever
 from rag.chunking import CharacterChunker
+from rag.contracts import Retriever
+from rag.reranking import RerankingRetriever
 
 
 def build_chunker(profile) -> CharacterChunker:
@@ -53,6 +56,45 @@ def _build_uncached_embedder(profile):
             timeout=config["EMBEDDING_TIMEOUT"],
         )
     raise ImproperlyConfigured(f"Unknown embedding provider {profile.provider!r}.")
+
+
+def build_retriever(
+    build,
+    *,
+    mode=None,
+    candidate_k=None,
+    rank_constant=None,
+    reranker=None,
+    rerank_candidate_k=None,
+) -> Retriever:
+    config = settings.RAG
+    mode = mode if mode is not None else config["RETRIEVAL_MODE"]
+    reranker = reranker if reranker is not None else config["RERANKER"]
+    if reranker not in ("none", "jina"):
+        raise ImproperlyConfigured(f"Unknown reranker {reranker!r}.")
+    retriever = PostgresRetriever(
+        build,
+        build_embedder(build.profile) if mode != "lexical" else None,
+        mode=mode,
+        candidate_k=config["RETRIEVAL_CANDIDATES"] if candidate_k is None else candidate_k,
+        rank_constant=config["RRF_K"] if rank_constant is None else rank_constant,
+    )
+    if reranker == "none":
+        return retriever
+    if not config["JINA_API_KEY"]:
+        raise ImproperlyConfigured("JINA_KEY is required for Jina reranking.")
+    return RerankingRetriever(
+        retriever,
+        JinaReranker(
+            api_key=config["JINA_API_KEY"],
+            base_url=config["JINA_BASE_URL"],
+            model=config["RERANK_MODEL"],
+            timeout=config["RERANK_TIMEOUT"],
+        ),
+        candidate_k=(
+            config["RERANK_CANDIDATES"] if rerank_candidate_k is None else rerank_candidate_k
+        ),
+    )
 
 
 def build_answer_generator():

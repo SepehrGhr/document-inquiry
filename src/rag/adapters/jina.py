@@ -1,12 +1,15 @@
-"""Jina embeddings adapter.
+"""Jina embedding and reranking adapters.
 
-Jina's API is OpenAI-shaped but takes a `task` parameter that tells the model
-whether the text is a document or a query. Using the right task for each side
-is the main reason to prefer this adapter over a generic OpenAI-compatible one.
+Embedding requests use task-specific query/passage representations. Reranking
+scores the original candidate texts and maps results back by their input index.
 """
+
+import math
+from dataclasses import replace
 
 import httpx
 
+from rag.contracts import RetrievedPassage
 from rag.exceptions import ProviderError
 
 DOCUMENT_TASK = "retrieval.passage"
@@ -52,3 +55,52 @@ class JinaEmbedder:
                     f"but the index profile expects {self.dimension}."
                 )
         return vectors
+
+
+class JinaReranker:
+    def __init__(self, *, api_key, base_url, model, timeout=60):
+        self._api_key = api_key
+        self._url = f"{base_url.rstrip('/')}/rerank"
+        self._model = model
+        self._timeout = timeout
+
+    def rerank(
+        self, question: str, passages: list[RetrievedPassage], *, limit: int
+    ) -> list[RetrievedPassage]:
+        if limit < 1:
+            raise ValueError("limit must be positive.")
+        if not passages:
+            return []
+        top_n = min(limit, len(passages))
+        try:
+            # A one-shot request closes its client after use; retrievers are built
+            # per API request, so retaining an unclosed connection pool would leak.
+            response = httpx.post(
+                self._url,
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                json={
+                    "model": self._model,
+                    "query": question,
+                    "documents": [passage.text for passage in passages],
+                    "top_n": top_n,
+                    "return_documents": False,
+                },
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            results = response.json()["results"]
+            if not isinstance(results, list) or len(results) != top_n:
+                raise ValueError("Unexpected number of reranking results.")
+            seen = set()
+            ranked = []
+            for rank, result in enumerate(results, start=1):
+                index, score = result["index"], result["relevance_score"]
+                if type(index) is not int or not 0 <= index < len(passages) or index in seen:
+                    raise ValueError("Invalid or duplicate reranking index.")
+                if type(score) not in (int, float) or not math.isfinite(score):
+                    raise ValueError("Invalid reranking score.")
+                seen.add(index)
+                ranked.append(replace(passages[index], rank=rank, score=float(score)))
+            return ranked
+        except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+            raise ProviderError(f"Reranking request failed: {exc}") from exc

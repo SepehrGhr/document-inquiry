@@ -5,7 +5,9 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rag.adapters.lexical import QUERY_VERSION
 from rag.evaluation.metrics import group_by, retrieval_summary
+from rag.search_text import NORMALIZATION_VERSION
 
 
 def run_metadata(build, *, top_k: int, retrieval_mode: str) -> dict:
@@ -32,8 +34,22 @@ def run_metadata(build, *, top_k: int, retrieval_mode: str) -> dict:
 
 def retrieval_report(run, *, top_k: int) -> dict:
     results = run.results
+    metadata = run_metadata(run.build, top_k=top_k, retrieval_mode=run.retrieval_mode)
+    metadata["reranking"] = {"provider": run.reranker}
+    if run.reranker != "none":
+        metadata["reranking"].update(model=run.rerank_model, candidate_k=run.rerank_candidate_k)
+    if run.retrieval_mode in ("lexical", "hybrid_rrf"):
+        metadata["lexical"] = {
+            "configuration": "simple",
+            "ranking": "ts_rank_cd",
+            "normalization_version": NORMALIZATION_VERSION,
+            "query_version": QUERY_VERSION,
+        }
+    if run.retrieval_mode == "hybrid_rrf":
+        metadata["candidate_k"] = run.candidate_k
+        metadata["rrf_k"] = run.rank_constant
     return {
-        "metadata": run_metadata(run.build, top_k=top_k, retrieval_mode="dense"),
+        "metadata": metadata,
         "overall": retrieval_summary([r.score for r in results]),
         "by_difficulty": {
             difficulty: retrieval_summary([r.score for r in group])
@@ -96,6 +112,17 @@ def retrieval_markdown(report: dict) -> str:
     if report["errors"]:
         lines += ["", "## Errors", ""]
         lines += [f"- `{error['question_id']}`: {error['error']}" for error in report["errors"]]
+    if meta["retrieval_mode"] == "hybrid_rrf":
+        lines += ["", f"Candidates per retriever: {meta['candidate_k']}; RRF k: {meta['rrf_k']}."]
+    reranking = meta.get("reranking", {"provider": "none"})
+    if reranking["provider"] == "none":
+        lines += ["", "Reranking: disabled."]
+    else:
+        lines += [
+            "",
+            f"Reranking: {reranking['provider']} / `{reranking['model']}`; "
+            f"candidate pool: {reranking['candidate_k']}.",
+        ]
     return "\n".join(lines) + "\n"
 
 

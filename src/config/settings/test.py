@@ -15,3 +15,4 @@ CELERY_TASK_EAGER_PROPAGATES = True
 RAG["AUTO_INDEX"] = False  # noqa: F405
 RAG["ANSWER_PROVIDER"] = "fake"  # noqa: F405
 RAG["EMBEDDING_CACHE"] = False  # noqa: F405
+RAG["RERANKER"] = "none"  # noqa: F405

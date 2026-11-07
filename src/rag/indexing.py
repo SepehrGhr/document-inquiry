@@ -16,6 +16,7 @@ from django.utils import timezone
 from documents.models import Document, DocumentRevision
 from rag import factory
 from rag.models import IndexBuild, IndexBuildRevision, IndexedChunk, IndexProfile
+from rag.search_text import normalize_search_text
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ def _index_revisions(build: IndexBuild) -> int:
                         revision=link.revision,
                         ordinal=chunk.ordinal,
                         text=chunk.text,
+                        search_text=normalize_search_text(chunk.text),
                         start=chunk.start,
                         end=chunk.end,
                         content_sha256=hashlib.sha256(chunk.text.encode("utf-8")).hexdigest(),

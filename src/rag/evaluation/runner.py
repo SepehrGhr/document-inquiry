@@ -9,8 +9,9 @@ import logging
 import time
 from dataclasses import dataclass, field
 
+from django.conf import settings
+
 from rag import factory
-from rag.adapters import pgvector_index
 from rag.evaluation.dataset import Corpus, EvalQuestion
 from rag.evaluation.metrics import RetrievalScore
 from rag.models import IndexBuild
@@ -35,6 +36,12 @@ class RetrievalResult:
 @dataclass
 class RetrievalRun:
     build: IndexBuild
+    retrieval_mode: str = "dense"
+    candidate_k: int = 20
+    rank_constant: int = 60
+    reranker: str = "none"
+    rerank_model: str = ""
+    rerank_candidate_k: int = 20
     results: list[RetrievalResult] = field(default_factory=list)
     errors: list[tuple[str, str]] = field(default_factory=list)
 
@@ -44,20 +51,40 @@ def run_retrieval(
     build: IndexBuild,
     *,
     top_k: int,
+    mode: str = "dense",
+    candidate_k: int = 20,
+    rank_constant: int = 60,
+    reranker: str = "none",
+    rerank_candidate_k: int = 20,
     limit: int = 0,
     delay: float = 0.0,
     progress=None,
 ) -> RetrievalRun:
     """Search the index for every question and record which documents came back."""
-    embedder = factory.build_embedder(build.profile)
+    retriever = factory.build_retriever(
+        build,
+        mode=mode,
+        candidate_k=candidate_k,
+        rank_constant=rank_constant,
+        reranker=reranker,
+        rerank_candidate_k=rerank_candidate_k,
+    )
     questions = corpus.questions[:limit] if limit else corpus.questions
-    run = RetrievalRun(build=build)
+    rerank_pool = max(rerank_candidate_k, top_k) if reranker != "none" else 0
+    run = RetrievalRun(
+        build=build,
+        retrieval_mode=mode,
+        candidate_k=max(candidate_k, top_k, rerank_pool),
+        rank_constant=rank_constant,
+        reranker=reranker,
+        rerank_model=settings.RAG["RERANK_MODEL"] if reranker != "none" else "",
+        rerank_candidate_k=rerank_pool,
+    )
 
     for index, question in enumerate(questions, start=1):
         started = time.monotonic()
         try:
-            vector = embedder.embed_query(question.question)
-            passages = pgvector_index.search(build, vector, top_k)
+            passages = retriever.retrieve(question.question, limit=top_k)
         except Exception as exc:
             logger.warning("Retrieval failed for %s: %s", question.id, exc)
             run.errors.append((question.id, str(exc)))

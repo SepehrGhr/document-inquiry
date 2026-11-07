@@ -1,6 +1,8 @@
 import uuid
 
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.db import models
 from pgvector.django import VectorField
 
@@ -132,6 +134,12 @@ class IndexedChunk(models.Model):
     revision = models.ForeignKey(DocumentRevision, on_delete=models.CASCADE, related_name="+")
     ordinal = models.PositiveIntegerField()
     text = models.TextField()
+    search_text = models.TextField(default="", editable=False)
+    search_vector = models.GeneratedField(
+        expression=SearchVector("search_text", config="simple"),
+        output_field=SearchVectorField(),
+        db_persist=True,
+    )
     start = models.PositiveIntegerField()
     end = models.PositiveIntegerField()
     content_sha256 = models.CharField(max_length=64)
@@ -139,6 +147,7 @@ class IndexedChunk(models.Model):
 
     class Meta:
         ordering = ["document", "ordinal"]
+        indexes = [GinIndex(fields=["search_vector"], name="chunk_search_vector_gin")]
         constraints = [
             models.UniqueConstraint(
                 fields=["profile", "revision", "ordinal"], name="unique_chunk_per_profile_revision"

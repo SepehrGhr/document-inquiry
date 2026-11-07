@@ -36,6 +36,26 @@ Three milestones are complete and committed:
 3. **Evaluation harness** — a 49-document synthetic corpus, 71 questions, a
    retrieval evaluation command, and a measured dense baseline.
 
+**Hybrid retrieval + RRF is now implemented (uncommitted).** It is opt-in:
+the measured overall recall@5 is 0.791 versus dense 0.814, so dense remains
+the default. See `docs/eval-baseline.md` for the comparison and limitations.
+
+**Optional Jina reranking is also implemented (uncommitted), disabled by default.**
+`RAG_RERANKER=jina` wraps any retrieval mode with a larger candidate shortlist
+(default 20) and Jina's `jina-reranker-v2-base-multilingual`, then selects `TOP_K`.
+The model, candidate depth, and timeout are configurable; it reuses `JINA_KEY`
+and `RAG_JINA_BASE_URL`. No index rebuild or migration is needed. Passage IDs,
+text, and citation metadata are preserved; persisted scores become reranker
+relevance scores. Provider errors fail explicitly, with no silent fallback.
+Live reranking has now been verified on all 71 questions in both dense and
+hybrid modes. Dense + Jina recall@5 is 0.853 versus dense 0.814; hybrid + Jina
+is 0.845. Dense + Jina improves full labeled multi-hop coverage@5 from 5/18
+to 11/18 but lowers hit@5 (0.983 → 0.915) and regresses exact-term/ambiguous
+cases. Reranking remains opt-in. The two hybrid SSL handshake timeouts were
+recovered by resuming only failed/pending questions; failure snapshots remain.
+Results/provenance: `eval-results/rerank-comparison-20261107T020532Z/`;
+human-readable summary: `docs/eval-baseline.md`. No answer-quality pass ran.
+
 The **answer pass of the evaluation is not built yet**, and the answer model is
 currently blocked (see "Blockers" below).
 
@@ -68,6 +88,9 @@ currently blocked (see "Blockers" below).
 src/rag/
   contracts.py        # Chunk, RetrievedPassage, AnswerResult, protocols
   chunking.py         # CharacterChunker (char-1), offsets into exact text
+  search_text.py      # lexical-1 normalization of derived text only
+  retrieval.py        # pure chunk-level reciprocal rank fusion
+  reranking.py        # optional retriever wrapper; enlarge pool before reranking
   citations.py        # [S1] extraction and validation
   models.py           # IndexProfile, IndexBuild, IndexBuildRevision,
                       # IndexedChunk (pgvector), Question, Answer, AnswerSource
@@ -81,6 +104,9 @@ src/rag/
     jina.py           # Jina embeddings with retrieval.passage/query tasks
     cache.py          # disk cache for embeddings (CachedEmbedder)
     pgvector_index.py # dense search scoped to the active build
+    chunk_queries.py  # shared chunk scope and passage mapping
+    lexical.py        # PostgreSQL simple/ts_rank_cd, OR terms, query stopwords
+    retriever.py      # dense / lexical / hybrid_rrf orchestration
     fakes.py          # HashingEmbedder, EchoAnswerGenerator (tests)
   evaluation/
     dataset.py        # load + validate manifest.json / questions.jsonl
@@ -106,6 +132,12 @@ src/rag/
 - An answer with no valid citation is stored as an abstention.
 - Embeddings are cached on disk by `(model, text)`, so re-runs and re-indexing
   unchanged text cost nothing.
+- API and evaluation both call `factory.build_retriever()`. Both search
+  methods use the same profile/build/revision/deletion scope. Fusion uses
+  chunk IDs, counts each chunk once per list, and assigns new ranks/scores.
+- `0002_indexedchunk_search_text_and_more` backfills lexical text for existing
+  chunks and adds a generated search vector plus GIN index. Run migrations;
+  no embedding profile change, re-index, or provider call is required.
 
 ### Index profiles in the dev database
 
@@ -152,9 +184,27 @@ manage.py rebuild_index --profile jina-v3 --sync
 
 # Retrieval-only evaluation (no chat calls)
 manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10
+
+# Hybrid comparison (use separate output folders to preserve previous runs)
+manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10 \
+  --mode hybrid_rrf --candidate-k 20 --rrf-k 60 --output eval-results/hybrid
+
+# Optional reranking (live Jina calls even with cached query embeddings)
+manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10 \
+  --mode dense --reranker jina --rerank-candidate-k 20 \
+  --output eval-results/dense-reranked
 ```
 
+Reranking defaults to `none` in evaluation, independently of API settings.
+Reports record reranking provider, model, and effective candidate depth, plus
+the enlarged per-channel depth in hybrid mode. Use matched top-k values and
+separate output paths for comparisons. See README for all reranker settings.
+
 Results go to `eval-results/retrieval.json` and `retrieval.md` (gitignored).
+`--mode` accepts `dense` (default), `lexical`, or `hybrid_rrf`. API mode is
+configured separately by `RAG_RETRIEVAL_MODE` (default `dense`);
+`RAG_RETRIEVAL_CANDIDATES=20` and `RAG_RRF_K=60` control fusion. Candidate depth
+is at least the requested output depth. Lexical-only mode needs no embedder.
 
 ### Dense baseline (Jina v3, top-k 10, 59 scored questions, 0 errors)
 
@@ -189,9 +239,34 @@ An earlier partial OpenRouter run showed r@5 0.907, but it covered only 43 of
 59 questions with the hard multi-hop ones missing. **Treat that number as
 invalid.**
 
+### Hybrid comparison (2026-11-07)
+
+| Mode | Recall@5 | Recall@10 | MRR |
+|---|---|---|---|
+| dense | 0.814 | 0.924 | 0.808 |
+| lexical (`simple` + `ts_rank_cd`) | 0.653 | 0.720 | 0.627 |
+| hybrid RRF (20 candidates each, k=60) | 0.791 | 0.924 | 0.698 |
+
+All modes ran on the same active Jina build and all 71 questions, with 59
+scored and zero errors. The 12 unanswerable questions have no source labels
+and are excluded from retrieval aggregates. All 71 query vectors came from
+the disk cache, and provider calls were disabled during the comparison.
+
+Hybrid improves multi-hop recall@5 (0.648 -> 0.685) and adversarial source
+recall (0.750 -> 1.000) but hurts simple, ambiguous, and Persian results
+overall. Dense stays the default. This measures
+retrieval only; answer quality, abstention, and injection resistance remain
+unmeasured. Detailed methods and tier numbers: `docs/eval-baseline.md`.
+
+Reports are under gitignored
+`eval-results/hybrid-comparison-20261107T011005Z/{dense,lexical,hybrid_rrf}/`.
+That run used the uncommitted hybrid code on top of `29030ac`.
+Earlier `010603Z` and `010652Z` runs preceded a stored-vector ranking fix;
+do not use those figures as the final hybrid baseline.
+
 ## Verification status
 
-- `pytest` — 77 passed (needs a pgvector-enabled PostgreSQL; see below).
+- `pytest` — 108 passed (`TEST_POSTGRES_PORT=5434`, including mocked Jina reranking).
 - `ruff check .` — clean; `ruff format` applied.
 - `makemigrations --check --dry-run` — no pending changes.
 - OpenAPI generation — 0 errors, 0 warnings.
@@ -204,6 +279,7 @@ invalid.**
 ### Git history (branch `master`, no remote)
 
 ```
+29030ac docs: update readme and handoff for jina and evaluation
 e9d2a0d test: add sanasa evaluation corpus and questions
 ccf5372 feat(rag): add retrieval evaluation harness and corpus loader
 9501014 feat(rag): add jina embedder and disk embedding cache
@@ -219,9 +295,9 @@ cb9c1c0 docs: add handoff notes for the rag milestone
 9ba817f chore: bootstrap django project with docker and postgres
 ```
 
-Working tree is clean except an untracked `.agents/` directory (a mirror of
-`.claude/skills/` that appeared during a session; not created by us, left
-alone).
+Hybrid retrieval changes and this documentation update are uncommitted.
+The untracked `.agents/` directory is a pre-existing mirror of
+`.claude/skills/`; leave it alone.
 
 ### Gitignored local-only paths
 
@@ -269,10 +345,12 @@ tests/
   unit/test_eval_metrics.py    # pure metrics
   unit/test_eval_runner.py
   unit/test_eval_report.py
+  unit/test_retrieval.py        # RRF voting/deduplication, lexical normalization
   integration/test_services.py # lifecycle, locking, revisions
   integration/test_rag_indexing.py
   integration/test_rag_dispatch.py
   integration/test_eval_corpus.py
+  integration/test_hybrid_retrieval.py # full-text ranking, scope, backfill, eval wiring
   api/test_documents_api.py    # REST endpoints
   api/test_questions_api.py    # question endpoint, history, auth
   api/test_admin.py            # Admin writes go through services
@@ -308,15 +386,16 @@ tests/
    tables in document order. No headers/footers/text boxes/page numbers.
 
 7. **No normalization of stored text.** Persian, English, mixed text, half-spaces
-   and zero-width characters are stored exactly as provided. Any search-specific
-   normalization belongs in a *derived* representation later, not in the source.
+   and zero-width characters are stored exactly as provided. Lexical search
+   normalizes a derived `IndexedChunk.search_text` representation. Its generated
+   vector uses `simple`; source and citation text are never normalized.
 
 8. **Auth.** Staff-only throughout. Session auth (Admin/browsable API) + DRF
    token auth. Tokens via `manage.py create_api_token <username>`. No signup.
 
 9. **Contracts, not frameworks.** `rag/contracts.py` defines `Chunk`,
    `RetrievedPassage`, `AnswerResult`, and the `Chunker`/`Embedder`/
-   `AnswerGenerator` protocols. LangChain and provider SDKs live only in
+   `Retriever`/`AnswerGenerator` protocols. LangChain and provider SDKs live only in
    `rag/adapters/`; `rag/factory.py` is the single composition point.
 
 10. **Embedding changes are data migrations.** `IndexProfile` records provider,
@@ -351,7 +430,8 @@ size and overlap.
 `IndexBuildRevision`: which immutable revisions a build covers.
 
 `IndexedChunk`: profile FK, document FK, revision FK, ordinal, text, start/end
-offsets, content hash, pgvector `embedding`. Unique on
+offsets, content hash, pgvector `embedding`, derived `search_text`, generated
+`search_vector` (`tsvector`) with a GIN index. Unique on
 `(profile, revision, ordinal)`.
 
 `Question`: text, asked_by, created_at.
@@ -415,9 +495,11 @@ sequence, ordinal, rank, score, `cited`, text snapshot.
   `--retrieval-only`. Still needed: `judge.py` (deterministic checks plus an
   LLM judge for multi-hop/ambiguous/adversarial), answer metrics in the report,
   and the full baseline run. Blocked on the answer model.
-- **Lexical retrieval + RRF**, then an optional reranker, only if evaluation
-  justifies it. This does not need the answer model — it can be measured with
-  the retrieval pass alone.
+- **Investigate reranking regressions and evaluate answers.** Both dense and
+  hybrid reranking have complete live retrieval benchmarks (see above).
+  Dense + Jina improves mean source coverage but lowers hit@5; inspect Arabic
+  source q029 and ambiguous q053–q055 before promoting it. Add held-out cases
+  and audit alternative sufficient sources before tuning the same 71 questions.
 - **Docker end-to-end run** of web + worker + redis + pgvector db.
 - **Vector index (HNSW/IVFFlat)** once the corpus is large enough to need it.
 - **Async answer generation** if free-model latency makes the request path
@@ -473,9 +555,12 @@ sequence, ordinal, rank, score, `cited`, text snapshot.
   a new build or a purge.
 - No per-user ownership; all staff share one library.
 - Admin chrome is LTR; Persian text renders correctly but the UI is not RTL.
-- No full-text search yet — `?search=` is a title substring filter only.
-- Retrieval is dense-only (vanilla RAG). No lexical/BM25 retrieval, rank
-  fusion, or reranking yet.
+- Lexical full-text search is available inside the RAG retriever. The document
+  listing's `?search=` remains a title substring filter.
+- Hybrid lexical+dense RRF is implemented but opt-in because overall recall
+  on the current corpus regresses against dense. BM25 is not implemented;
+  optional Jina reranking improves mean source recall but regresses hit@5 and
+  some exact-term/ambiguous cases, so it also remains opt-in.
 - Answer generation is synchronous inside the request. Slow free models can
   make `POST /questions/` slow; indexing is the only asynchronous step.
 - Free models are rate-limited and can change or disappear. Every answer

@@ -44,9 +44,7 @@ def ask(*, text, actor) -> Answer:
 
 
 def _retrieve(build, text) -> list[RetrievedPassage]:
-    embedder = factory.build_embedder(build.profile)
-    vector = embedder.embed_query(text)
-    return pgvector_index.search(build, vector, settings.RAG["TOP_K"])
+    return factory.build_retriever(build).retrieve(text, limit=settings.RAG["TOP_K"])
 
 
 def _persist_answer(question, build, passages, result, latency_ms) -> Answer:

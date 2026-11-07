@@ -71,3 +71,13 @@ class AnswerGenerator(Protocol):
     """Answers a question strictly from the supplied evidence passages."""
 
     def generate(self, question: str, passages: list[RetrievedPassage]) -> AnswerResult: ...
+
+
+class Retriever(Protocol):
+    def retrieve(self, text: str, *, limit: int) -> list[RetrievedPassage]: ...
+
+
+class Reranker(Protocol):
+    def rerank(
+        self, question: str, passages: list[RetrievedPassage], *, limit: int
+    ) -> list[RetrievedPassage]: ...

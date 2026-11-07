@@ -115,8 +115,17 @@ RAG = {
     "ACTIVE_PROFILE": os.environ.get("RAG_ACTIVE_PROFILE", "default"),
     "AUTO_INDEX": os.environ.get("RAG_AUTO_INDEX", "true") == "true",
     "TOP_K": int(os.environ.get("RAG_TOP_K", "5")),
+    "RETRIEVAL_MODE": os.environ.get("RAG_RETRIEVAL_MODE", "dense"),
+    "RETRIEVAL_CANDIDATES": int(os.environ.get("RAG_RETRIEVAL_CANDIDATES", "20")),
+    "RRF_K": int(os.environ.get("RAG_RRF_K", "60")),
+    "RERANKER": os.environ.get("RAG_RERANKER", "none"),
+    "RERANK_MODEL": os.environ.get("RAG_RERANK_MODEL", "jina-reranker-v2-base-multilingual"),
+    "RERANK_CANDIDATES": int(os.environ.get("RAG_RERANK_CANDIDATES", "20")),
+    "RERANK_TIMEOUT": int(os.environ.get("RAG_RERANK_TIMEOUT", "60")),
     "OPENROUTER_API_KEY": os.environ.get("OPENROUTER_KEY", ""),
-    "OPENROUTER_BASE_URL": os.environ.get("RAG_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+    "OPENROUTER_BASE_URL": os.environ.get(
+        "RAG_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+    ),
     "ANSWER_PROVIDER": os.environ.get("RAG_ANSWER_PROVIDER", "openrouter"),
     "ANSWER_MODEL": os.environ.get("RAG_ANSWER_MODEL", "stealth/crouton-alpha"),
     "ANSWER_TIMEOUT": int(os.environ.get("RAG_ANSWER_TIMEOUT", "60")),
