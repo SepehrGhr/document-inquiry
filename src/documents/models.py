@@ -64,9 +64,7 @@ class DocumentRevision(models.Model):
             models.UniqueConstraint(
                 fields=["document", "sequence"], name="unique_revision_sequence"
             ),
-            models.CheckConstraint(
-                condition=Q(sequence__gte=1), name="revision_sequence_positive"
-            ),
+            models.CheckConstraint(condition=Q(sequence__gte=1), name="revision_sequence_positive"),
             models.CheckConstraint(
                 condition=(
                     Q(source="text", file="", file_size__isnull=True)

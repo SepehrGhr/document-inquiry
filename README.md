@@ -1,7 +1,50 @@
 # Document Q&A
 
 A Django service for managing text documents and DOCX uploads, and answering
-questions grounded in them with a RAG pipeline (LangChain, pgvector, Celery).
+questions grounded in them with a replaceable RAG pipeline (LangChain, pgvector,
+Celery, and Redis).
+
+## Reviewer quick start
+
+This repository is designed to be reviewable without a frontend. Django Admin is
+the UI, and the REST API is documented with OpenAPI/Swagger.
+
+```bash
+cp .env.example .env
+# For a key-free local demo, use the values in the "Offline demo" section below.
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
+```
+
+Open:
+
+- Admin: http://localhost:8000/admin/
+- API docs: http://localhost:8000/api/docs/
+- Liveness: http://localhost:8000/health/live/
+- Readiness: http://localhost:8000/health/ready/
+
+For a live Jina/OpenRouter demo, set `JINA_KEY` and `OPENROUTER_KEY` in `.env`,
+create a Jina profile, and build its index as shown below. The Compose file is a
+local-review configuration: it uses Django's development server, plain HTTP, and
+binds the web port to localhost. Do not use it as a production deployment.
+
+## Offline demo
+
+The default test settings use deterministic fake adapters. This is useful for
+running the suite without credentials, but the normal application settings use
+real providers. A reviewer can run the same flow locally without network calls:
+
+```bash
+export DJANGO_SETTINGS_MODULE=config.settings.test
+export POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5434
+.venv/bin/pytest -q
+```
+
+The test suite exercises document creation, indexing, retrieval, citations, API
+history, hybrid retrieval, optional reranking, and the long-document evaluation
+loader. It is the reproducible offline verification path, not a substitute for a
+live answer-generation demo.
 
 ## What works today
 
@@ -250,6 +293,28 @@ On the 71-question Jina v3 comparison (59 questions with expected sources, zero
 errors), dense recall@5 is **0.814** and hybrid is **0.791**. The full summary,
 conditions, and limitations are in [docs/eval-baseline.md](docs/eval-baseline.md).
 
+### Long-document and chunking evaluation
+
+Optional `evidence.jsonl` and `splits.json` sidecars add exact source-span coverage,
+alternative sufficient evidence sets, and development/test selection. Validate
+without provider calls or database access:
+
+```bash
+python manage.py validate_eval_corpus --corpus tests/fixtures/corpus_long_v1
+```
+
+Build experimental profiles with `rebuild_index --sync --no-activate`, then use
+`evaluate_rag --build BUILD_UUID --split development` to evaluate a completed
+inactive build without changing the live index. `--context-chars` adds an
+explicit source-character budget (not a token estimate). Reports retain raw
+selected passages/offsets, context overlap, index inventory, input hashes, and
+requested/completed/failed counts. Failed runs save reports and exit nonzero.
+
+For the supported annotation schema, metrics, and the full size/overlap comparison
+workflow, see [docs/long-document-evaluation.md](docs/long-document-evaluation.md).
+The original corpus remains supported without sidecars. This adds evaluation
+infrastructure, not new paragraph/table chunkers or answer-quality judging.
+
 ## Design notes
 
 - **Services own writes.** `documents/services.py` is the only write path; API
@@ -310,5 +375,14 @@ conditions, and limitations are in [docs/eval-baseline.md](docs/eval-baseline.md
   corpora but will need an index at scale.
 - Deleting a document excludes it from retrieval immediately, but its chunks
   remain stored until a new build or a purge.
-- The evaluation answer pass is not built yet; only retrieval is measured.
-  Recall is document-level, not chunk-level.
+- Answer-quality evaluation and an LLM judge are not implemented; only retrieval
+  and evidence coverage are measured. Citation validation checks that cited
+  references exist in the supplied passages; it does not semantically prove
+  every claim in an answer.
+- Reranking and live provider calls add latency and cost and require
+  credentials. Each nonempty shortlist makes a live Jina request.
+- The long-document pilot corpus has a known annotation issue (`ld016`) and
+  fact families that cross development/test splits, so its results are
+  exploratory development evidence, not a clean held-out benchmark. The
+  original fixture was not edited; see
+  [docs/long-document-evaluation.md](docs/long-document-evaluation.md).

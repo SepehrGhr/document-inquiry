@@ -36,11 +36,11 @@ Three milestones are complete and committed:
 3. **Evaluation harness** — a 49-document synthetic corpus, 71 questions, a
    retrieval evaluation command, and a measured dense baseline.
 
-**Hybrid retrieval + RRF is now implemented (uncommitted).** It is opt-in:
+**Hybrid retrieval + RRF is implemented (committed in `7fba302`).** It is opt-in:
 the measured overall recall@5 is 0.791 versus dense 0.814, so dense remains
 the default. See `docs/eval-baseline.md` for the comparison and limitations.
 
-**Optional Jina reranking is also implemented (uncommitted), disabled by default.**
+**Optional Jina reranking is implemented (also in `7fba302`), disabled by default.**
 `RAG_RERANKER=jina` wraps any retrieval mode with a larger candidate shortlist
 (default 20) and Jina's `jina-reranker-v2-base-multilingual`, then selects `TOP_K`.
 The model, candidate depth, and timeout are configurable; it reuses `JINA_KEY`
@@ -55,6 +55,31 @@ cases. Reranking remains opt-in. The two hybrid SSL handshake timeouts were
 recovered by resuming only failed/pending questions; failure snapshots remain.
 Results/provenance: `eval-results/rerank-comparison-20261107T020532Z/`;
 human-readable summary: `docs/eval-baseline.md`. No answer-quality pass ran.
+
+**Long-document evaluation support is implemented (committed with the final polish).** Optional
+`evidence.jsonl`/`splits.json` add exact source-span/alternative-set validation,
+split-family leakage checks, evidence coverage at raw passage ranks, context
+character budgets/overlap, raw passage traces, provenance, and failure accounting.
+`validate_eval_corpus` is offline; `rebuild_index --sync --no-activate` creates
+experimental builds; `evaluate_rag --build UUID --split development` can query
+them without changing the live build. See `docs/long-document-evaluation.md`
+for canonical sidecar schemas and commands. No paragraph/table chunker,
+model-token budget, neighbor expansion, or answer judging was added.
+
+**Long-corpus pilot evaluation completed.** Original files/ZIP were not edited.
+At user request, a separate evaluation copy omitted inconsistent `ld016` and
+converted the generator's split lists while documenting existing fact-family
+leakage. This is exploratory development evidence, not a clean held-out result.
+Ten documents were ingested with auto-indexing disabled; three experimental
+builds remain inactive and the original live index is unchanged. Six runs each
+completed 39 development questions, zero errors, with 33 evidence-scored and
+20 test questions untouched. At top-10, complete evidence was 27/33, 26/33,
+31/33 for 600/100, 1200/200, 2400/400 size/overlap; mean context sizes were
+4,686, 9,205, 17,386 characters. At matched 6,000 source characters, complete
+evidence was 27/33, 26/33, 23/33. Small chunks led complete coverage at the
+matched budget; no default changed. Results/build IDs/preparation notes:
+`eval-results/long-chunking-20261107T031907Z/`; summary in the long-document
+guide above. No answer-quality evaluation ran.
 
 The **answer pass of the evaluation is not built yet**, and the answer model is
 currently blocked (see "Blockers" below).
@@ -260,13 +285,13 @@ unmeasured. Detailed methods and tier numbers: `docs/eval-baseline.md`.
 
 Reports are under gitignored
 `eval-results/hybrid-comparison-20261107T011005Z/{dense,lexical,hybrid_rrf}/`.
-That run used the uncommitted hybrid code on top of `29030ac`.
+That run used the hybrid code now committed in `7fba302`.
 Earlier `010603Z` and `010652Z` runs preceded a stored-vector ranking fix;
 do not use those figures as the final hybrid baseline.
 
 ## Verification status
 
-- `pytest` — 108 passed (`TEST_POSTGRES_PORT=5434`, including mocked Jina reranking).
+- `pytest` — 160 passed (`TEST_POSTGRES_PORT=5433`, pgvector container, including evidence/split and inactive-build evaluation tests).
 - `ruff check .` — clean; `ruff format` applied.
 - `makemigrations --check --dry-run` — no pending changes.
 - OpenAPI generation — 0 errors, 0 warnings.
@@ -274,11 +299,16 @@ do not use those figures as the final hybrid baseline.
 - Live Jina embedding calls verified (English, Persian, mixed, batch).
 - Live OpenRouter chat verified earlier (English, Persian, abstention).
 - **Not verified:** the evaluation answer pass, and a full `docker compose`
-  run of web + worker + redis.
+  run of web + worker + redis. The final polish attempt could not build the
+  image: `pip install` inside the Docker build fails with `Temporary failure
+  in name resolution` for `files.pythonhosted.org` (Docker Desktop DNS on this
+  machine). `docker compose config` validates; the image build is blocked by
+  the environment, not the project.
 
-### Git history (branch `master`, no remote)
+### Git history (branch `feat/hybrid-jina-reranking`, no remote)
 
 ```
+7fba302 feat(rag): add hybrid retrieval and optional jina reranking
 29030ac docs: update readme and handoff for jina and evaluation
 e9d2a0d test: add sanasa evaluation corpus and questions
 ccf5372 feat(rag): add retrieval evaluation harness and corpus loader
@@ -295,7 +325,8 @@ cb9c1c0 docs: add handoff notes for the rag milestone
 9ba817f chore: bootstrap django project with docker and postgres
 ```
 
-Hybrid retrieval changes and this documentation update are uncommitted.
+Hybrid retrieval and reranking are committed in `7fba302`; the long-document
+evaluation tooling and reviewer polish are committed in the final polish commit.
 The untracked `.agents/` directory is a pre-existing mirror of
 `.claude/skills/`; leave it alone.
 

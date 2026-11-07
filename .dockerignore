@@ -5,5 +5,13 @@ __pycache__
 .pytest_cache
 .ruff_cache
 .env
+.env.*
+!.env.example
+.cache
+eval-results
+model-guide
+.claude
+.agents
+*.zip
 media
 staticfiles

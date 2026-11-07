@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import UUID
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -9,7 +10,7 @@ from rag.evaluation.dataset import CorpusError
 from rag.evaluation.dataset import load_corpus as read_corpus
 from rag.evaluation.report import retrieval_markdown, retrieval_report, write_json
 from rag.evaluation.runner import run_retrieval
-from rag.models import IndexProfile
+from rag.models import IndexBuild, IndexProfile
 
 
 class Command(BaseCommand):
@@ -18,6 +19,15 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--corpus", default="tests/fixtures/corpus")
         parser.add_argument("--profile", default=settings.RAG["ACTIVE_PROFILE"])
+        parser.add_argument(
+            "--build", type=UUID, help="Completed build UUID, including inactive builds."
+        )
+        parser.add_argument("--split", default="all", choices=("all", "development", "test"))
+        parser.add_argument(
+            "--context-chars",
+            type=int,
+            help="Rank-preserving source-text character budget; clips the last passage.",
+        )
         parser.add_argument("--top-k", type=int, default=settings.RAG["TOP_K"])
         parser.add_argument("--mode", choices=RETRIEVAL_MODES, default="dense")
         parser.add_argument("--candidate-k", type=int, default=settings.RAG["RETRIEVAL_CANDIDATES"])
@@ -47,6 +57,10 @@ class Command(BaseCommand):
         for name in ("top_k", "candidate_k", "rrf_k", "rerank_candidate_k"):
             if options[name] < 1:
                 raise CommandError(f"--{name.replace('_', '-')} must be positive.")
+        if options["context_chars"] is not None and options["context_chars"] < 1:
+            raise CommandError("--context-chars must be positive.")
+        if options["limit"] < 0 or options["delay"] < 0:
+            raise CommandError("--limit and --delay cannot be negative.")
         try:
             corpus = read_corpus(options["corpus"])
         except CorpusError as exc:
@@ -55,25 +69,42 @@ class Command(BaseCommand):
         profile = IndexProfile.objects.filter(name=options["profile"]).first()
         if profile is None:
             raise CommandError(f"No index profile named {options['profile']!r}.")
-        build = pgvector_index.active_build()
-        if build is None or build.profile_id != profile.id:
-            raise CommandError(
-                f"No active build for profile {profile.name!r}. Run rebuild_index first."
+        if options["build"]:
+            build = (
+                IndexBuild.objects.filter(
+                    pk=options["build"], profile=profile, status=IndexBuild.Status.COMPLETED
+                )
+                .select_related("profile")
+                .first()
             )
+            if build is None:
+                raise CommandError("--build must identify a completed build for --profile.")
+        else:
+            build = pgvector_index.active_build()
+            if build is None or build.profile_id != profile.id:
+                raise CommandError(
+                    f"No active build for profile {profile.name!r}. Run rebuild_index first "
+                    "or pass a completed --build UUID."
+                )
 
-        run = run_retrieval(
-            corpus,
-            build,
-            top_k=options["top_k"],
-            mode=options["mode"],
-            candidate_k=options["candidate_k"],
-            rank_constant=options["rrf_k"],
-            reranker=options["reranker"],
-            rerank_candidate_k=options["rerank_candidate_k"],
-            limit=options["limit"],
-            delay=options["delay"],
-            progress=self._progress,
-        )
+        try:
+            run = run_retrieval(
+                corpus,
+                build,
+                top_k=options["top_k"],
+                mode=options["mode"],
+                candidate_k=options["candidate_k"],
+                rank_constant=options["rrf_k"],
+                reranker=options["reranker"],
+                rerank_candidate_k=options["rerank_candidate_k"],
+                split=options["split"],
+                context_chars=options["context_chars"],
+                limit=options["limit"],
+                delay=options["delay"],
+                progress=self._progress,
+            )
+        except CorpusError as exc:
+            raise CommandError(str(exc)) from exc
         report = retrieval_report(run, top_k=options["top_k"])
 
         output = Path(options["output"])
@@ -86,6 +117,8 @@ class Command(BaseCommand):
             f"mrr={overall['mrr']:.3f} errors={len(report['errors'])}"
         )
         self.stdout.write(f"Wrote {output / 'retrieval.json'} and {output / 'retrieval.md'}")
+        if run.errors:
+            raise CommandError("Evaluation had failed questions; partial reports were saved.")
 
     def _progress(self, index, total, question, result):
         self.stdout.write(

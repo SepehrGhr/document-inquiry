@@ -48,8 +48,8 @@ def create_build(profile: IndexProfile) -> IndexBuild:
     return build
 
 
-def run_build(build_id) -> IndexBuild:
-    """Embed any missing chunks, then activate the build if it is still current."""
+def run_build(build_id, *, activate=True) -> IndexBuild:
+    """Embed missing chunks; optionally activate a still-current completed build."""
     build = IndexBuild.objects.select_related("profile").get(pk=build_id)
     if build.status == IndexBuild.Status.COMPLETED:
         return build
@@ -74,7 +74,8 @@ def run_build(build_id) -> IndexBuild:
         build.chunk_count = chunk_count
         build.completed_at = timezone.now()
         build.save(update_fields=["status", "chunk_count", "completed_at"])
-        _activate_if_current(build)
+        if activate:
+            _activate_if_current(build)
     return build
 
 

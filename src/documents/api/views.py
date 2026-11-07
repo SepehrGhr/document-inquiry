@@ -20,9 +20,7 @@ from documents.exceptions import DocumentNotFound, InvalidDocumentInput, Revisio
 
 
 def _content_input(validated):
-    return services.ContentInput(
-        text=validated.get("text"), docx_file=validated.get("file")
-    )
+    return services.ContentInput(text=validated.get("text"), docx_file=validated.get("file"))
 
 
 def _active_document(document_id):

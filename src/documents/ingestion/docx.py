@@ -46,9 +46,7 @@ def parse_docx(upload) -> ParsedDocument:
             if block.text.strip():
                 blocks.append(block.text)
         else:
-            rows = [
-                " | ".join(cell.text.strip() for cell in row.cells) for row in block.rows
-            ]
+            rows = [" | ".join(cell.text.strip() for cell in row.cells) for row in block.rows]
             table_text = "\n".join(row for row in rows if row.strip(" |"))
             if table_text:
                 blocks.append(table_text)

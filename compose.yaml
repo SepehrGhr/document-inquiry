@@ -1,3 +1,4 @@
+# Local reviewer/development stack, not a production deployment.
 services:
   db:
     image: pgvector/pgvector:pg17
@@ -23,15 +24,18 @@ services:
 
   web:
     build: .
-    env_file: .env
+    # runserver supplies Admin static assets and plain HTTP for local review.
+    command: python manage.py runserver 0.0.0.0:8000 --noreload
+    env_file: ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SETTINGS_MODULE: config.settings.development
       POSTGRES_HOST: db
       CELERY_BROKER_URL: redis://redis:6379/0
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
     volumes:
       - media_data:/app/media
+      - embedding_cache:/app/.cache/embeddings
     depends_on:
       db:
         condition: service_healthy
@@ -41,13 +45,14 @@ services:
   worker:
     build: .
     command: celery -A config worker --loglevel=info
-    env_file: .env
+    env_file: ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SETTINGS_MODULE: config.settings.development
       POSTGRES_HOST: db
       CELERY_BROKER_URL: redis://redis:6379/0
     volumes:
       - media_data:/app/media
+      - embedding_cache:/app/.cache/embeddings
     depends_on:
       db:
         condition: service_healthy
@@ -57,3 +62,4 @@ services:
 volumes:
   postgres_data:
   media_data:
+  embedding_cache:

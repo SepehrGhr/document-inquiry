@@ -33,6 +33,8 @@ class RetrievedPassage:
     text: str
     score: float
     rank: int
+    start: int | None = None
+    end: int | None = None
 
 
 @dataclass(frozen=True)

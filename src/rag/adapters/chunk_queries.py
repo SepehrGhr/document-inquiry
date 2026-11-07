@@ -11,6 +11,8 @@ PASSAGE_FIELDS = (
     "revision__sequence",
     "ordinal",
     "text",
+    "start",
+    "end",
 )
 
 
@@ -33,4 +35,6 @@ def to_passage(row, *, score, rank):
         text=row["text"],
         score=score,
         rank=rank,
+        start=row["start"],
+        end=row["end"],
     )
