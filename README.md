@@ -1,8 +1,31 @@
+![Document Q&A: answers grounded in documents with cited sources](docs/banner.svg)
+
 # Document Q&A
 
 A Django service for managing text documents and DOCX uploads, and answering
 questions grounded in them with a replaceable RAG pipeline (LangChain, pgvector,
 Celery, and Redis).
+
+## How it works
+
+The Django application handles document management and questions. Redis and a
+Celery worker run indexing in the background; PostgreSQL stores the documents,
+revisions, search data, and answer history. Configured providers supply
+embeddings, optional reranking, and answer generation.
+
+![System architecture: Django connects staff users with PostgreSQL, Redis, a Celery worker, and model providers](docs/assets/system-architecture.svg)
+
+Documents are committed before indexing begins. Once a current index build is
+active, a separate question request retrieves evidence and returns an answer
+with sources or an abstention.
+
+![Document and question journey: submission, revision, indexing, retrieval, generation, and response](docs/assets/document-question-flow.svg)
+
+The pipeline supports dense, lexical, and hybrid retrieval. Jina reranking is
+optional; citation validation checks references to supplied passages rather
+than proving that every claim is semantically supported.
+
+![RAG pipeline showing indexing, dense, lexical and hybrid retrieval, optional reranking, generation, and citation validation](docs/assets/rag-pipeline.svg)
 
 ## Reviewer quick start
 

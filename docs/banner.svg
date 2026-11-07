@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="460" viewBox="0 0 1400 460" role="img" aria-labelledby="title desc">
+  <title id="title">Document Q&amp;A</title>
+  <desc id="desc">Documents flow into an answer with a cited source.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#101c32"/><stop offset="1" stop-color="#080f1d"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#526eac" stop-opacity=".25"/><stop offset="1" stop-color="#7de0d5" stop-opacity=".9"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#386f9c" stop-opacity=".25"/><stop offset="1" stop-color="#386f9c" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M36 0H0V36" fill="none" stroke="#b5d8ff" stroke-opacity=".045"/>
+    </pattern>
+  </defs>
+  <rect width="1400" height="460" rx="20" fill="url(#bg)"/>
+  <rect width="1400" height="460" rx="20" fill="url(#grid)"/>
+  <ellipse cx="1000" cy="220" rx="390" ry="220" fill="url(#glow)"/>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="76" y="113" fill="#80d7d2" font-size="15" font-weight="700" letter-spacing="3">DOCUMENT INTELLIGENCE</text>
+    <text x="72" y="195" fill="#f1f6ff" font-size="64" font-weight="700" letter-spacing="-2">Document Q&amp;A</text>
+    <text x="76" y="243" fill="#a6b8d0" font-size="22">Answers grounded in your documents.</text>
+    <rect x="76" y="302" width="94" height="32" rx="16" fill="#1b3049" stroke="#35516c"/>
+    <text x="123" y="323" text-anchor="middle" fill="#bcd3e7" font-size="12" font-weight="700" letter-spacing="1">TEXT</text>
+    <rect x="180" y="302" width="94" height="32" rx="16" fill="#1b3049" stroke="#35516c"/>
+    <text x="227" y="323" text-anchor="middle" fill="#bcd3e7" font-size="12" font-weight="700" letter-spacing="1">DOCX</text>
+    <rect x="284" y="302" width="123" height="32" rx="16" fill="#1b3049" stroke="#35516c"/>
+    <text x="345.5" y="323" text-anchor="middle" fill="#bcd3e7" font-size="12" font-weight="700" letter-spacing="1">CITATIONS</text>
+    <g fill="none" stroke="url(#line)" stroke-width="2">
+      <path d="M865 153 C930 153 914 220 982 220"/>
+      <path d="M865 303 C930 303 914 220 982 220"/>
+    </g>
+    <circle cx="927" cy="220" r="6" fill="#80ddd6"/>
+    <circle cx="927" cy="220" r="14" fill="none" stroke="#80ddd6" stroke-opacity=".25"/>
+    <g transform="translate(684 95)">
+      <rect x="8" y="10" width="174" height="115" rx="12" fill="#060e1b" opacity=".35"/>
+      <rect width="174" height="115" rx="12" fill="#172b43" stroke="#54718e"/>
+      <path d="M20 25h16v20H20z M24 30h8 M24 34h8 M24 38h5" fill="none" stroke="#7edbd5" stroke-width="1.5" stroke-linecap="round"/>
+      <text x="48" y="39" fill="#d6e5f3" font-size="13" font-weight="600">Document</text>
+      <path d="M21 65h118 M21 78h131 M21 91h88" stroke="#708ba6" stroke-opacity=".65" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(684 244)">
+      <rect x="8" y="10" width="174" height="115" rx="12" fill="#060e1b" opacity=".35"/>
+      <rect width="174" height="115" rx="12" fill="#172b43" stroke="#54718e"/>
+      <path d="M20 25h16v20H20z M24 30h8 M24 34h8 M24 38h5" fill="none" stroke="#8eacff" stroke-width="1.5" stroke-linecap="round"/>
+      <text x="48" y="39" fill="#d6e5f3" font-size="13" font-weight="600">Document</text>
+      <path d="M21 65h131 M21 78h103 M21 91h113" stroke="#708ba6" stroke-opacity=".65" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(982 135)">
+      <rect x="10" y="12" width="306" height="190" rx="16" fill="#060e1b" opacity=".4"/>
+      <rect width="306" height="190" rx="16" fill="#1b3048" stroke="#63859a"/>
+      <circle cx="30" cy="32" r="10" fill="#315c65"/>
+      <path d="M26 32l3 3 5-6" fill="none" stroke="#93eee0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="49" y="37" fill="#e2f3f7" font-size="15" font-weight="700">Grounded answer</text>
+      <path d="M25 69h244 M25 86h219 M25 103h233" stroke="#a8c4d3" stroke-opacity=".7" stroke-width="5" stroke-linecap="round"/>
+      <rect x="25" y="132" width="139" height="32" rx="7" fill="#284a58" stroke="#548a88"/>
+      <text x="40" y="153" fill="#a7eee3" font-size="12" font-weight="700">[1] Source passage</text>
+    </g>
+  </g>
+</svg>
