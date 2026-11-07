@@ -19,6 +19,8 @@ questions grounded in them with a RAG pipeline (LangChain, pgvector, Celery).
   abstention on weak evidence, and question/answer history.
 - Background indexing through Celery + Redis, triggered after a revision
   commits (from both the API and Admin).
+- A retrieval evaluation harness with a committed 49-document synthetic corpus
+  and 71 questions across six difficulty tiers.
 
 ## Run with Docker
 
@@ -35,9 +37,13 @@ and build the index:
 
 ```bash
 docker compose exec web python manage.py create_index_profile \
-  --model <embedding-model-id> --dimension <dimension>
-docker compose exec web python manage.py rebuild_index
+  --name jina-v3 --provider jina --model jina-embeddings-v3 --dimension 1024
+docker compose exec web python manage.py rebuild_index --profile jina-v3
 ```
+
+Set `RAG_ACTIVE_PROFILE=jina-v3` in `.env` so new revisions are indexed under
+that profile automatically. Embeddings are cached on disk (`.cache/embeddings/`),
+so re-indexing unchanged text costs nothing.
 
 - Admin: http://localhost:8000/admin/
 - API docs: http://localhost:8000/api/docs/
@@ -116,8 +122,32 @@ docker run -d --name roshan-test-db -p 5433:5432 \
 ```
 
 The default suite uses deterministic fake adapters (`RAG_ANSWER_PROVIDER=fake`,
-`CELERY_TASK_ALWAYS_EAGER=true` in `config.settings.test`), so it never needs
-Redis, an API key, or network access.
+`CELERY_TASK_ALWAYS_EAGER=true`, `RAG_EMBEDDING_CACHE=false` in
+`config.settings.test`), so it never needs Redis, an API key, or network access.
+
+## Evaluation
+
+`tests/fixtures/corpus/` holds a synthetic corpus about the fictional brick
+factory **Sanasa (ساناسا)**: 49 `.docx` documents (English, Persian, mixed,
+Arabic, German) and 71 questions across six difficulty tiers — simple,
+exact-term, multi-hop, ambiguous, unanswerable, and adversarial. The corpus
+includes outdated price lists, near-duplicate specs, and prompt-injection text
+on purpose.
+
+```bash
+# Load the corpus (idempotent by title; --reset removes it first)
+python manage.py load_eval_corpus --actor <username>
+
+# Build the index for a profile
+python manage.py rebuild_index --profile jina-v3 --sync
+
+# Retrieval-only evaluation (no chat calls)
+python manage.py evaluate_rag --retrieval-only --profile jina-v3 --top-k 10
+```
+
+Results are written to `eval-results/` (gitignored). The current dense baseline
+with Jina v3 is recall@5 0.814 and MRR 0.808 over 59 scored questions; the
+per-tier breakdown is in `HANDOFF.md`.
 
 ## Design notes
 
@@ -136,8 +166,13 @@ Redis, an API key, or network access.
   footers, text boxes, or page numbers.
 - **RAG is a separate app with explicit contracts.** `rag/contracts.py` defines
   `Chunk`, `RetrievedPassage`, `AnswerResult`, and the `Chunker`/`Embedder`/
-  `AnswerGenerator` interfaces. LangChain and OpenRouter live only in
+  `AnswerGenerator` interfaces. LangChain and the provider SDKs live only in
   `rag/adapters/`; `rag/factory.py` is the single composition point.
+- **Embedders are swappable.** OpenRouter and Jina adapters both implement the
+  same contract. The Jina adapter uses its `retrieval.passage` /
+  `retrieval.query` task parameter, which is why it is preferred for retrieval.
+- **Embeddings are cached on disk** by `(model, text)`, so evaluation re-runs
+  and re-indexing unchanged text make no provider calls.
 - **Embedding changes are data migrations.** `IndexProfile` records the model,
   dimension, metric, and chunker versions. Changing any of them means a new
   profile and a new build, not a settings flip.
@@ -164,13 +199,13 @@ Redis, an API key, or network access.
   fusion, or reranking yet; those are the next, evaluation-driven steps.
 - Answer generation is synchronous inside the request. Slow free models can
   make `POST /questions/` slow; indexing is the only asynchronous step.
-- OpenRouter free models are rate-limited and can change or disappear. Every
-  answer records the provider and model used, but historical answers are not
-  reproducible if the model changes.
-- The embedding model is not chosen yet; `create_index_profile` takes it as an
-  argument. OpenRouter may not serve a suitable embedding model, in which case
-  the embedder adapter needs a different provider.
+- Free models are rate-limited and can change or disappear. OpenRouter's free
+  tier allows 50 requests/day; Jina has been reliable. Every answer records the
+  provider and model used, but historical answers are not reproducible if the
+  model changes.
 - No vector index (HNSW/IVFFlat) is created; search is exact and fine for small
   corpora but will need an index at scale.
 - Deleting a document excludes it from retrieval immediately, but its chunks
   remain stored until a new build or a purge.
+- The evaluation answer pass is not built yet; only retrieval is measured.
+  Recall is document-level, not chunk-level.
