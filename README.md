@@ -237,7 +237,7 @@ Tests run against PostgreSQL (not SQLite) because the lifecycle relies on row
 locks and database constraints, and the RAG app needs the `vector` extension:
 
 ```bash
-docker run -d --name roshan-test-db -p 5433:5432 \
+docker run -d --name documents-test-db -p 5433:5432 \
   -e POSTGRES_DB=documents -e POSTGRES_USER=documents -e POSTGRES_PASSWORD=documents \
   pgvector/pgvector:pg17
 .venv/bin/pytest

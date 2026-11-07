@@ -496,12 +496,12 @@ sequence, ordinal, rank, score, `cited`, text snapshot.
   migration. Recreate the container with:
 
   ```bash
-  docker run -d --name roshan-test-db -p 5433:5432 \
+  docker run -d --name documents-test-db -p 5433:5432 \
     -e POSTGRES_DB=documents -e POSTGRES_USER=documents -e POSTGRES_PASSWORD=documents \
     pgvector/pgvector:pg17
   ```
 
-  During the RAG work a second container `roshan-test-db-pgvector` was run on
+  During the RAG work a second container `documents-test-db-pgvector` was run on
   port 5434 and tests were run with `TEST_POSTGRES_PORT=5434`. Either works.
 - **This machine cannot resolve `files.pythonhosted.org` from inside Docker.**
   `docker compose build` fails at `pip install`. The image was verified by
